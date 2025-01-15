@@ -2,17 +2,23 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
+	"go-fullstack/graph"
 	"log"
 	"net/http"
-
-	"fmt"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/99designs/gqlgen/graphql/handler/lru"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
+	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/coder/websocket"
+	"github.com/vektah/gqlparser/v2/ast"
 )
 
 func (s *Server) RegisterRoutes() http.Handler {
@@ -32,6 +38,9 @@ func (s *Server) RegisterRoutes() http.Handler {
 	r.Get("/health", s.healthHandler)
 
 	r.Get("/websocket", s.websocketHandler)
+
+	r.Get("/graphql", playground.Handler("GraphQL playground", "/graphql/query"))
+	r.Post("/graphql/query", s.graphqlHandler)
 
 	return r
 }
@@ -55,7 +64,6 @@ func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 	socket, err := websocket.Accept(w, r, nil)
-
 	if err != nil {
 		log.Printf("could not open websocket: %v", err)
 		_, _ = w.Write([]byte("could not open websocket"))
@@ -76,4 +84,21 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		time.Sleep(time.Second * 2)
 	}
+}
+
+func (s *Server) graphqlHandler(w http.ResponseWriter, r *http.Request) {
+	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{}}))
+
+	srv.AddTransport(transport.Options{})
+	srv.AddTransport(transport.GET{})
+	srv.AddTransport(transport.POST{})
+
+	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
+
+	srv.Use(extension.Introspection{})
+	srv.Use(extension.AutomaticPersistedQuery{
+		Cache: lru.New[string](100),
+	})
+
+	srv.ServeHTTP(w, r)
 }
