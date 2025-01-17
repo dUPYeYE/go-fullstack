@@ -1,7 +1,3 @@
-# GraphQL schema example
-#
-# https://gqlgen.com/getting-started/
-
 scalar Time
 scalar UUID
 
@@ -9,7 +5,7 @@ type User {
   id: UUID!
   name: String!
   email: String!
-  role: String
+  role: String!
   createdAt: Time!
   updatedAt: Time!
 }
@@ -23,9 +19,14 @@ type RefreshToken {
   revokedAt: Time
 }
 
+input UserFilter {
+  id: UUID
+  email: String
+}
+
 type Query {
   users: [User!]!
-  user(id: UUID!): User
+  user(filter: UserFilter!): User
 }
 
 input CreateUserInput {
@@ -45,4 +46,8 @@ type Mutation {
   createUser(input: CreateUserInput!): User!
   updateUser(id: UUID!, input: UpdateUserInput!): User!
   deleteUser(id: UUID!): Boolean!
+
+  login(email: String!, password: String!): String!
+  refreshToken: String!
+  logout: Boolean!
 }

@@ -7,14 +7,51 @@ package graph
 import (
 	"context"
 	"fmt"
-	"go-fullstack/graph/model"
+	"net/http"
+	"os"
+	"time"
 
 	"github.com/google/uuid"
+	_ "github.com/joho/godotenv/autoload"
+
+	"go-fullstack/graph/model"
+	"go-fullstack/internal/auth"
+	"go-fullstack/internal/database"
 )
 
 // CreateUser is the resolver for the createUser field.
 func (r *mutationResolver) CreateUser(ctx context.Context, input model.CreateUserInput) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: CreateUser - createUser"))
+	if r.DB == nil {
+		return nil, fmt.Errorf("DB is nil")
+	}
+
+	defaultRole := "user"
+	if input.Role == nil {
+		input.Role = &defaultRole
+	}
+	hashedPassword, err := auth.HashPassword(input.Password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	user, err := r.DB.CreateUser(ctx, database.CreateUserParams{
+		Name:     input.Name,
+		Email:    input.Email,
+		Password: hashedPassword,
+		Role:     *input.Role,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	return &model.User{
+		ID:        user.ID,
+		Name:      user.Name,
+		Email:     user.Email,
+		Role:      user.Role,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}, nil
 }
 
 // UpdateUser is the resolver for the updateUser field.
@@ -27,14 +64,173 @@ func (r *mutationResolver) DeleteUser(ctx context.Context, id uuid.UUID) (bool, 
 	panic(fmt.Errorf("not implemented: DeleteUser - deleteUser"))
 }
 
+// Login is the resolver for the login field.
+func (r *mutationResolver) Login(ctx context.Context, email string, password string) (string, error) {
+	w, ok := ctx.Value("httpResponseWriter").(http.ResponseWriter)
+	if !ok {
+		return "", fmt.Errorf("failed to get http.ResponseWriter from context")
+	}
+
+	user, err := r.DB.GetUserByEmail(ctx, email)
+	if err != nil {
+		return "", fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if err = auth.CheckPasswordHash(password, user.Password); err != nil {
+		return "", fmt.Errorf("invalid password: %w", err)
+	}
+
+	jwtToken, err := auth.GenerateJWT(user.ID, os.Getenv("JWT_SECRET"), time.Hour)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate JWT: %w", err)
+	}
+
+	refreshToken, err := auth.GenerateRefreshToken()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	if _, err = r.DB.AddRefreshToken(ctx, database.AddRefreshTokenParams{
+		UserID: user.ID,
+		Token:  refreshToken,
+	}); err != nil {
+		return "", fmt.Errorf("failed to add refresh token: %w", err)
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		HttpOnly: true,
+		Secure:   true,
+		Expires:  time.Now().Add(time.Hour * 24 * 60),
+		Path:     "/",
+	})
+
+	return jwtToken, nil
+}
+
+// RefreshToken is the resolver for the refreshToken field.
+func (r *mutationResolver) RefreshToken(ctx context.Context) (string, error) {
+	req, ok := ctx.Value("httpRequest").(*http.Request)
+	if !ok {
+		return "", fmt.Errorf("failed to get http.Request from context")
+	}
+
+	cookie, err := req.Cookie("refresh_token")
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve refresh token from cookies: %w", err)
+	}
+
+	refreshToken, err := r.DB.GetRefreshToken(ctx, cookie.Value)
+	if err != nil {
+		return "", fmt.Errorf("failed to get refresh token: %w", err)
+	}
+
+	if refreshToken.ExpiresAt.Before(time.Now()) {
+		return "", fmt.Errorf("refresh token has expired")
+	}
+
+	user := auth.ForContext(ctx)
+	if user.ID == uuid.Nil {
+		return "", fmt.Errorf("user not found in context")
+	}
+
+	if user.ID != refreshToken.UserID {
+		return "", fmt.Errorf("user ID does not match refresh token")
+	}
+
+	jwtToken, err := auth.GenerateJWT(user.ID, os.Getenv("JWT_SECRET"), time.Hour)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate JWT: %w", err)
+	}
+
+	return jwtToken, nil
+}
+
+// Logout is the resolver for the logout field.
+func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
+	w, ok := ctx.Value("httpResponseWriter").(http.ResponseWriter)
+	if !ok {
+		return false, fmt.Errorf("failed to get http.ResponseWriter from context")
+	}
+
+	req, ok := ctx.Value("httpRequest").(*http.Request)
+	if !ok {
+		return false, fmt.Errorf("failed to get http.Request from context")
+	}
+
+	cookie, err := req.Cookie("refresh_token")
+	if err != nil {
+		return false, fmt.Errorf("failed to retrieve refresh token from cookies: %w", err)
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		HttpOnly: true,
+		Secure:   true,
+		Expires:  time.Now().Add(-time.Hour),
+	})
+
+	if err := r.DB.RevokeRefreshToken(ctx, cookie.Value); err != nil {
+		return false, fmt.Errorf("failed to revoke refresh token: %w", err)
+	}
+
+	return true, nil
+}
+
 // Users is the resolver for the users field.
 func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
-	panic(fmt.Errorf("not implemented: Users - users"))
+	userContext := auth.ForContext(ctx)
+	if userContext.Role != "admin" {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	user, err := r.DB.GetAllUsers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all users: %w", err)
+	}
+
+	var users []*model.User
+	for _, u := range user {
+		users = append(users, &model.User{
+			ID:        u.ID,
+			Name:      u.Name,
+			Email:     u.Email,
+			Role:      u.Role,
+			CreatedAt: u.CreatedAt,
+			UpdatedAt: u.UpdatedAt,
+		})
+	}
+
+	return users, nil
 }
 
 // User is the resolver for the user field.
-func (r *queryResolver) User(ctx context.Context, id uuid.UUID) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: User - user"))
+func (r *queryResolver) User(ctx context.Context, filter model.UserFilter) (*model.User, error) {
+	var user database.User
+	var err error
+
+	if filter.ID != nil {
+		user, err = r.DB.GetUserById(ctx, *filter.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user: %w", err)
+		}
+	} else if filter.Email != nil {
+		user, err = r.DB.GetUserByEmail(ctx, *filter.Email)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user: %w", err)
+		}
+	}
+
+	return &model.User{
+		ID:        user.ID,
+		Name:      user.Name,
+		Email:     user.Email,
+		Role:      user.Role,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}, nil
 }
 
 // Mutation returns MutationResolver implementation.
@@ -43,20 +239,7 @@ func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
-type mutationResolver struct{ *Resolver }
-type queryResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-/*
-	func (r *mutationResolver) CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error) {
-	panic(fmt.Errorf("not implemented: CreateTodo - createTodo"))
-}
-func (r *queryResolver) Todos(ctx context.Context) ([]*model.Todo, error) {
-	panic(fmt.Errorf("not implemented: Todos - todos"))
-}
-*/
+type (
+	mutationResolver struct{ *Resolver }
+	queryResolver    struct{ *Resolver }
+)

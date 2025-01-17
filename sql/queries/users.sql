@@ -12,11 +12,12 @@ SELECT * FROM users WHERE name = $1;
 
 
 -- name: CreateUser :one
-INSERT INTO users (name, email, password)
+INSERT INTO users (name, email, password, role)
 VALUES (
   $1,
   $2,
-  $3
+  $3,
+  $4
 )
 RETURNING *;
 

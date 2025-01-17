@@ -1,16 +1,12 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"go-fullstack/graph"
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
@@ -18,7 +14,13 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/coder/websocket"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/vektah/gqlparser/v2/ast"
+
+	"go-fullstack/graph"
+	"go-fullstack/internal/auth"
 )
 
 func (s *Server) RegisterRoutes() http.Handler {
@@ -33,7 +35,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 		MaxAge:           300,
 	}))
 
-	r.Get("/", s.HelloWorldHandler)
+	r.Use(auth.Middleware(s.db))
 
 	r.Get("/health", s.healthHandler)
 
@@ -43,18 +45,6 @@ func (s *Server) RegisterRoutes() http.Handler {
 	r.Post("/graphql/query", s.graphqlHandler)
 
 	return r
-}
-
-func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
-	resp := make(map[string]string)
-	resp["message"] = "Hello World"
-
-	jsonResp, err := json.Marshal(resp)
-	if err != nil {
-		log.Fatalf("error handling JSON marshal. Err: %v", err)
-	}
-
-	_, _ = w.Write(jsonResp)
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +77,12 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) graphqlHandler(w http.ResponseWriter, r *http.Request) {
-	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{}}))
+	ctx := context.WithValue(r.Context(), "httpResponseWriter", w)
+	ctx = context.WithValue(ctx, "httpRequest", r)
+
+	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{
+		DB: s.db.DBQueries(),
+	}}))
 
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GET{})
@@ -100,5 +95,5 @@ func (s *Server) graphqlHandler(w http.ResponseWriter, r *http.Request) {
 		Cache: lru.New[string](100),
 	})
 
-	srv.ServeHTTP(w, r)
+	srv.ServeHTTP(w, r.WithContext(ctx))
 }
