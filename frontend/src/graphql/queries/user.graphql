@@ -1,0 +1,21 @@
+query User($filter: UserFilter!) {
+  user(filter: $filter) {
+    id
+    name
+    email
+    role
+    createdAt
+    updatedAt
+  }
+}
+
+query Users {
+  users {
+    id
+    name
+    email
+    role
+    createdAt
+    updatedAt
+  }
+}

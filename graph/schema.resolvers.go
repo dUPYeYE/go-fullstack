@@ -77,7 +77,7 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 	}
 
 	if err = auth.CheckPasswordHash(password, user.Password); err != nil {
-		return "", fmt.Errorf("invalid password: %w", err)
+		return "", fmt.Errorf("Invalid password.")
 	}
 
 	jwtToken, err := auth.GenerateJWT(user.ID, os.Getenv("JWT_SECRET"), time.Hour)
