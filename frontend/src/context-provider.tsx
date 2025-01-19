@@ -1,32 +1,46 @@
-import React, { createContext, useContext, useState } from 'react';
-import { User, useRefreshTokenMutation } from '@/graphql/types/graphql';
-
-interface ContextProviderType {
-  user?: User | undefined;
-  setUser: (user: User | undefined) => void;
-  refreshToken: string | undefined;
-  setRefreshToken: (token: string | undefined) => void;
-}
-
-const Context = createContext<ContextProviderType | undefined>(undefined);
+import React, { useEffect, useState } from 'react';
+import { useMeLazyQuery, useRefreshTokenMutation } from '@/graphql/types/graphql';
+import { Context } from './types/context';
+import { useAuth } from './hooks/use-auth';
 
 export function ContextProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | undefined>(undefined);
-  const [refreshToken, setRefreshToken] = useState<string | undefined>(undefined);
+  const [accessToken, setAccessToken] = useState<string | undefined>(undefined);
+
+  const { logIn, logOut, user, setUser } = useAuth(getUserInfo, setAccessToken);
 
   const [getNewAccessToken] = useRefreshTokenMutation({ fetchPolicy: "no-cache", notifyOnNetworkStatusChange: true });
+  const [identifyByToken] = useMeLazyQuery({ fetchPolicy: "no-cache" });
+
+  useEffect(() => {
+    if (!user) {
+      setAccessToken("");
+    }
+  }, [user]);
+
+  const handleRefreshToken = async () => {
+    const { data } = await getNewAccessToken();
+    setAccessToken(data?.refreshToken);
+  }
+
+  async function getUserInfo (myToken: string) {
+    const userInfo = await identifyByToken({
+      fetchPolicy: "no-cache",
+      context: {
+        headers: {
+          authorization: `Bearer ${myToken}`,
+        },
+      },
+    });
+
+    if (userInfo.data) {
+      setUser(userInfo.data.me);
+      setAccessToken(myToken);
+    }
+  }
 
   return (
-    <Context.Provider value={{ user, setUser, refreshToken, setRefreshToken }}>
+    <Context.Provider value={{ user, setUser, accessToken, setAccessToken, logIn, logOut }}>
       {children}
     </Context.Provider>
   );
-};
-
-export const useAppContext = (): ContextProviderType => {
-  const context = useContext(Context);
-  if (!context) {
-    throw new Error('useAppContext must be used within a ContextProvider');
-  }
-  return context;
 };

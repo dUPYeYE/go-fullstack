@@ -69,7 +69,6 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 	if !ok {
 		return "", fmt.Errorf("failed to get http.ResponseWriter from context")
 	}
-	fmt.Println("Login resolver")
 
 	user, err := r.DB.GetUserByEmail(ctx, email)
 	if err != nil {

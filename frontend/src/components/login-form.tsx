@@ -4,27 +4,20 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useLoginMutation } from "@/graphql/types/graphql"
 import { toast } from "sonner"
 import { useState } from "react"
+import { useAppContext } from "@/hooks/use-context"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
-  const [login] = useLoginMutation({
-    onCompleted() {
-      toast.success("Logged in successfully.")
-    },
-    onError: (error) => {
-      toast.error(`Failed to login: ${error.message}`)
-    }
-  })
+  const { logIn } = useAppContext();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
 
   const handleLogin = async () => {
-    toast.promise(login({ variables: { email, password } }), {
+    toast.promise(logIn(email, password), {
       loading: "Logging in...",
     });
   }

@@ -9,6 +9,17 @@ query User($filter: UserFilter!) {
   }
 }
 
+query Me {
+  me {
+    id
+    name
+    email
+    role
+    createdAt
+    updatedAt
+  }
+}
+
 query Users {
   users {
     id

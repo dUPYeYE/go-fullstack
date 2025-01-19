@@ -27,6 +27,7 @@ input UserFilter {
 type Query {
   users: [User!]!
   user(filter: UserFilter!): User
+  me: User!
 }
 
 input CreateUserInput {

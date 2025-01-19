@@ -19,7 +19,7 @@ const root = createRoot(document.getElementById("root")!);
 function RootComponent() {
   let myToken: string;
 
-  const link = new HttpLink({ uri: "https://localhost:8080/graphql/query", credentials: "include" });
+  const link = new HttpLink({ uri: "http://localhost:8080/graphql/query", credentials: "include" });
 
   const authLink = mySetContext((_, { headers }) => {
     return myToken ? { headers: { ...headers, Authorization: myToken } } : { headers: { ...headers } };
@@ -104,7 +104,14 @@ function RootComponent() {
                 <div className="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
                   <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
                     {"Built by "}
-                    <a href="https://fxgarage.eu" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-4">FX Garage</a>
+                    <a
+                      href="https://portfolio-dupp.vercel.app/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium underline underline-offset-4"
+                    >
+                      {"dupp"}
+                    </a>
                     {"."}
                   </p>
                 </div>
