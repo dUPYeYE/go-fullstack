@@ -21,30 +21,55 @@ const FormSchema = z.object({
   email: z.string().email({
     message: "Enter a correct email address.",
   }),
+  username: z.string().min(3, {
+    message: "Username must be at least 3 characters.",
+  }),
   password: z.string().min(3, {
     message: "Password must be at least 3 characters.",
   }),
-})
+  confirmPassword: z.string().min(3, {
+    message: "Password must be at least 3 characters.",
+  }),
+}).superRefine(({ password, confirmPassword }, ctx) => {
+  if (password !== confirmPassword) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Passwords do not match.",
+      path: ["confirmPassword"],
+    });
+  }
+});
 
-export function LoginForm({
+export function SignUpForm({
   className,
   setShowSignup,
   ...props
 }: React.ComponentPropsWithoutRef<"div"> & { setShowSignup: (show: boolean) => void }) {
-  const { logIn } = useAppContext();
+  const { register: signUp } = useAppContext();
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
       email: "",
+      username: "",
       password: "",
+      confirmPassword: "",
     },
   })
 
   const handleSubmit = async (data: z.infer<typeof FormSchema>) => {
-    toast.promise(logIn(data.email, data.password), {
-      loading: "Logging in...",
-    });
+    try {
+      const result = await signUp(data.email, data.password, data.username);
+
+      if (result === true) {
+        toast.success("Signed up successfully, sign in to continue.");
+        setShowSignup(false);
+      } else {
+        toast.error(result || "An error occurred.");
+      }
+    } catch (error) {
+      toast.error(`Failed to sign up.: ${JSON.stringify(error)}`);
+    }
   }
 
   return (
@@ -62,13 +87,14 @@ export function LoginForm({
             </a>
             <h1 className="text-xl font-bold">Welcome to my app.</h1>
             <div className="text-center text-sm">
-              Don&apos;t have an account?{" "}
+              Already have an account?{" "}
               <Button
                 variant="none"
                 size="text"
                 className="underline underline-offset-4"
-                onClick={() => setShowSignup(true)}>
-                Sign up
+                onClick={() => setShowSignup(false)}
+                >
+                Sign in
               </Button>
             </div>
           </div>
@@ -93,17 +119,43 @@ export function LoginForm({
                 <div className="grid gap-2">
                   <FormField
                     control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Username</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <FormField
+                    control={form.control}
                     name="password"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="flex">
                           {"Password"}
-                          <a
-                            href="#"
-                            className="ml-auto text-sm underline-offset-4 hover:underline justify-end"
-                          >
-                            Forgot your password?
-                          </a>
+                        </FormLabel>
+                        <FormControl>
+                          <Input type='password' {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex">
+                          {"Confirm password"}
                         </FormLabel>
                         <FormControl>
                           <Input type='password' {...field} />
@@ -114,7 +166,7 @@ export function LoginForm({
                   />
                 </div>
                 <Button type="submit" className="w-full">
-                  Sign in
+                  Sign up
                 </Button>
               </div>
             </form>

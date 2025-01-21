@@ -2,6 +2,17 @@ mutation Login($email: String!, $password: String!) {
   login(email: $email, password: $password)
 }
 
+mutation CreateUser($input: CreateUserInput!) {
+  createUser(input: $input) {
+    id
+    name
+    email
+    role
+    createdAt
+    updatedAt
+  }
+}
+
 mutation Logout {
   logout
 }

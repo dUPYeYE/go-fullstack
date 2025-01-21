@@ -5,8 +5,9 @@ import { useAuth } from './hooks/use-auth';
 
 export function ContextProvider({ children }: { children: React.ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | undefined>(undefined);
+  const [isAppInitialized, setIsAppInitialized] = useState<boolean>(false);
 
-  const { logIn, logOut, user, setUser } = useAuth(getUserInfo, setAccessToken);
+  const { logIn, logOut, register, user, setUser } = useAuth(getUserInfo, setAccessToken);
 
   const [getNewAccessToken] = useRefreshTokenMutation({ fetchPolicy: "no-cache", notifyOnNetworkStatusChange: true });
   const [identifyByToken] = useMeLazyQuery({ fetchPolicy: "no-cache" });
@@ -17,9 +18,20 @@ export function ContextProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  const handleRefreshToken = async () => {
-    const { data } = await getNewAccessToken();
-    setAccessToken(data?.refreshToken);
+  async function initApp() {
+    setIsAppInitialized(false);
+    try {
+      const token = await getNewAccessToken();
+      if (token.data) {
+        setAccessToken(token.data.refreshToken);
+        await getUserInfo(token.data.refreshToken);
+      }
+      console.log(token);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsAppInitialized(true);
+    }
   }
 
   async function getUserInfo (myToken: string) {
@@ -34,12 +46,23 @@ export function ContextProvider({ children }: { children: React.ReactNode }) {
 
     if (userInfo.data) {
       setUser(userInfo.data.me);
+      console.log(userInfo.data.me);
       setAccessToken(myToken);
     }
   }
 
   return (
-    <Context.Provider value={{ user, setUser, accessToken, setAccessToken, logIn, logOut }}>
+    <Context.Provider value={{
+      user,
+      setUser,
+      accessToken,
+      setAccessToken,
+      logIn,
+      logOut,
+      register,
+      isAppInitialized,
+      initApp
+    }}>
       {children}
     </Context.Provider>
   );

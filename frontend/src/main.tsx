@@ -8,11 +8,10 @@ import { setContext as mySetContext } from "@apollo/client/link/context";
 
 import App from './App.tsx'
 import { ThemeProvider } from '@/components/theme-provider.tsx';
-import { Separator } from '@/components/ui/separator.tsx';
-import { NavBar } from '@/components/navbar.tsx';
 import { Toaster } from '@/components/ui/sonner.tsx';
 import axios from 'axios';
 import { ContextProvider } from './context-provider.tsx';
+import { Footer } from './components/ui/footer.tsx';
 
 const root = createRoot(document.getElementById("root")!);
 
@@ -28,7 +27,7 @@ function RootComponent() {
   const errorLink = onError(({ graphQLErrors, operation, forward }) => {
     if (!graphQLErrors) return;
 
-    if (graphQLErrors[0].extensions.code === "NOT_ALLOWED" || graphQLErrors[0].extensions.code === "UNAUTHORIZED") {
+    if (graphQLErrors[0].extensions?.code === "NOT_ALLOWED" || graphQLErrors[0].extensions?.code === "UNAUTHORIZED") {
       return new Observable((observer) => {
         (async () => {
           try {
@@ -90,32 +89,15 @@ function RootComponent() {
   return (
     <StrictMode>
       <ApolloProvider client={client}>
-        <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+        <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
           <ContextProvider>
-            <div className="relative flex flex-col min-h-screen"> 
-              <NavBar />
-
-              <App />
+            <div data-wrapper="" className="border-grid flex flex-1 flex-col"> 
+              <main className="flex flex-1 flex-col">
+                <App />
+              </main>
+              <Footer />
 
               <Toaster />
-
-              <footer className="py-6 md:px-8 md:py-0">
-                <Separator />
-                <div className="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
-                  <p className="text-balance text-center text-sm leading-loose text-muted-foreground md:text-left">
-                    {"Built by "}
-                    <a
-                      href="https://portfolio-dupp.vercel.app/"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium underline underline-offset-4"
-                    >
-                      {"dupp"}
-                    </a>
-                    {"."}
-                  </p>
-                </div>
-              </footer> 
             </div>
           </ContextProvider>
         </ThemeProvider>
