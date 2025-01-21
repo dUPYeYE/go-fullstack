@@ -7,15 +7,16 @@ package graph
 import (
 	"context"
 	"fmt"
-	"go-fullstack/graph/model"
-	"go-fullstack/internal/auth"
-	"go-fullstack/internal/database"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
+
+	"go-fullstack/graph/model"
+	"go-fullstack/internal/auth"
+	"go-fullstack/internal/database"
 )
 
 // CreateUser is the resolver for the createUser field.
@@ -126,20 +127,11 @@ func (r *mutationResolver) RefreshToken(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to get refresh token: %w", err)
 	}
 
-	if refreshToken.ExpiresAt.Before(time.Now()) {
-		return "", fmt.Errorf("refresh token has expired")
+	if refreshToken.ExpiresAt.Before(time.Now()) || refreshToken.RevokedAt.Valid {
+		return "", fmt.Errorf("refresh token has expired or was revoked")
 	}
 
-	user := auth.ForContext(ctx)
-	if user.ID == uuid.Nil {
-		return "", fmt.Errorf("user not found in context")
-	}
-
-	if user.ID != refreshToken.UserID {
-		return "", fmt.Errorf("user ID does not match refresh token")
-	}
-
-	jwtToken, err := auth.GenerateJWT(user.ID, os.Getenv("JWT_SECRET"), time.Hour)
+	jwtToken, err := auth.GenerateJWT(refreshToken.UserID, os.Getenv("JWT_SECRET"), time.Hour)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate JWT: %w", err)
 	}
