@@ -26,7 +26,6 @@ export function ContextProvider({ children }: { children: React.ReactNode }) {
         setAccessToken(token.data.refreshToken);
         await getUserInfo(token.data.refreshToken);
       }
-      console.log(token);
     } catch (error) {
       console.error(error);
     } finally {
@@ -46,7 +45,6 @@ export function ContextProvider({ children }: { children: React.ReactNode }) {
 
     if (userInfo.data) {
       setUser(userInfo.data.me);
-      console.log(userInfo.data.me);
       setAccessToken(myToken);
     }
   }

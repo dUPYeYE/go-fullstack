@@ -27,7 +27,6 @@ export function useAuth(getUserInfo: (myToken: string) => void, setToken: (value
         const token = response.data.login;
         setToken(token);
         getUserInfo(token);
-        toast.success("Logged in successfully.");
         return true;
       }
     } catch (err: any) {

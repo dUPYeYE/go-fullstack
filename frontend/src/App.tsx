@@ -42,7 +42,7 @@ function App() {
     )
   }
 
-  return <RouterProvider router={createBrowserRouter(userRoutes(user))} />;
+  return <RouterProvider router={createBrowserRouter(userRoutes)} />;
 }
 
 export default App;
