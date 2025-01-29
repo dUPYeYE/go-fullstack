@@ -176,3 +176,40 @@ func (q *Queries) ResetPassword(ctx context.Context, arg ResetPasswordParams) (U
 	)
 	return i, err
 }
+
+const updateUser = `-- name: UpdateUser :one
+UPDATE users SET
+  name = $2,
+  email = $3,
+  role = $4,
+  updated_at = NOW()
+WHERE id = $1
+RETURNING id, name, email, role, password, created_at, updated_at
+`
+
+type UpdateUserParams struct {
+	ID    uuid.UUID
+	Name  string
+	Email string
+	Role  string
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateUser,
+		arg.ID,
+		arg.Name,
+		arg.Email,
+		arg.Role,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.Role,
+		&i.Password,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

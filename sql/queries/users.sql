@@ -27,6 +27,14 @@ SET password = $2
 WHERE id = $1
 RETURNING *;
 
-
 -- name: DeleteUser :exec
 DELETE FROM users WHERE id = $1;
+
+-- name: UpdateUser :one
+UPDATE users SET
+  name = $2,
+  email = $3,
+  role = $4,
+  updated_at = NOW()
+WHERE id = $1
+RETURNING *;

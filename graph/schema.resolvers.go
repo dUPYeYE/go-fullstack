@@ -56,12 +56,54 @@ func (r *mutationResolver) CreateUser(ctx context.Context, input model.CreateUse
 
 // UpdateUser is the resolver for the updateUser field.
 func (r *mutationResolver) UpdateUser(ctx context.Context, id uuid.UUID, input model.UpdateUserInput) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: UpdateUser - updateUser"))
+	userContext := auth.ForContext(ctx)
+	if userContext.ID != id && userContext.Role != "admin" {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	name, email, role := userContext.Name, userContext.Email, userContext.Role
+	if input.Name != nil {
+		name = *input.Name
+	}
+	if input.Email != nil {
+		email = *input.Email
+	}
+	if input.Role != nil {
+		role = *input.Role
+	}
+
+	user, err := r.DB.UpdateUser(ctx, database.UpdateUserParams{
+		ID:    id,
+		Name:  name,
+		Email: email,
+		Role:  role,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user: %w", err)
+	}
+
+	return &model.User{
+		ID:        user.ID,
+		Name:      user.Name,
+		Email:     user.Email,
+		Role:      user.Role,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}, nil
 }
 
 // DeleteUser is the resolver for the deleteUser field.
 func (r *mutationResolver) DeleteUser(ctx context.Context, id uuid.UUID) (bool, error) {
-	panic(fmt.Errorf("not implemented: DeleteUser - deleteUser"))
+	userContext := auth.ForContext(ctx)
+	if userContext.ID != id && userContext.Role != "admin" {
+		return false, fmt.Errorf("unauthorized")
+	}
+
+	if err := r.DB.DeleteUser(ctx, id); err != nil {
+		return false, fmt.Errorf("failed to delete user: %w", err)
+	}
+
+	return true, nil
 }
 
 // Login is the resolver for the login field.
