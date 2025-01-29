@@ -8,8 +8,6 @@ const columns = [
   "name",
   "email",
   "role",
-  "createdAt",
-  "updatedAt",
 ];
 
 export function DashboardPage() {

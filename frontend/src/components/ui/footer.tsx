@@ -11,8 +11,8 @@ export function Footer() {
               rel="noreferrer"
               className="font-medium underline underline-offset-4"
             >
-              dupp.
-            </a>
+              dupp
+            </a>.
           </div>
         </div>
       </div>

@@ -73,7 +73,7 @@ export function UserMenu({ className }: UserMenuProps): JSX.Element {
 
       <DropdownMenuContent align="end" forceMount className="w-56">
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger className="hover:text-background">
             <PaletteIcon />
             Theme
           </DropdownMenuSubTrigger>
