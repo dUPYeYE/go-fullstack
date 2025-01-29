@@ -57,10 +57,6 @@ func (r *mutationResolver) CreateUser(ctx context.Context, input model.CreateUse
 // UpdateUser is the resolver for the updateUser field.
 func (r *mutationResolver) UpdateUser(ctx context.Context, id uuid.UUID, input model.UpdateUserInput) (*model.User, error) {
 	userContext := auth.ForContext(ctx)
-	if userContext.ID != id && userContext.Role != "admin" {
-		return nil, fmt.Errorf("unauthorized")
-	}
-
 	name, email, role := userContext.Name, userContext.Email, userContext.Role
 	if input.Name != nil {
 		name = *input.Name
@@ -94,11 +90,6 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id uuid.UUID, input m
 
 // DeleteUser is the resolver for the deleteUser field.
 func (r *mutationResolver) DeleteUser(ctx context.Context, id uuid.UUID) (bool, error) {
-	userContext := auth.ForContext(ctx)
-	if userContext.ID != id && userContext.Role != "admin" {
-		return false, fmt.Errorf("unauthorized")
-	}
-
 	if err := r.DB.DeleteUser(ctx, id); err != nil {
 		return false, fmt.Errorf("failed to delete user: %w", err)
 	}
@@ -215,11 +206,6 @@ func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
 
 // Users is the resolver for the users field.
 func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
-	userContext := auth.ForContext(ctx)
-	if userContext.Role != "admin" {
-		return nil, fmt.Errorf("unauthorized")
-	}
-
 	user, err := r.DB.GetAllUsers(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all users: %w", err)

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
@@ -20,6 +21,7 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 
 	"go-fullstack/graph"
+	"go-fullstack/graph/model"
 	"go-fullstack/internal/auth"
 )
 
@@ -80,9 +82,26 @@ func (s *Server) graphqlHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.WithValue(r.Context(), "httpResponseWriter", w)
 	ctx = context.WithValue(ctx, "httpRequest", r)
 
-	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{
-		DB: s.db.DBQueries(),
-	}}))
+	gqlConfig := graph.Config{Resolvers: &graph.Resolver{DB: s.db.DBQueries()}}
+	gqlConfig.Directives.Authenticated = func(ctx context.Context, obj interface{}, next graphql.Resolver, role model.Role) (interface{}, error) {
+		user := auth.ForContext(ctx)
+		if user == (model.User{}) {
+			return nil, fmt.Errorf("Unauthenticated")
+		}
+
+		args := graphql.GetFieldContext(ctx).Args
+
+		fmt.Println(user)
+		if args["id"] != nil && user.Role != "admin" {
+			if user.ID != args["id"] {
+				return nil, fmt.Errorf("Access denied")
+			}
+		}
+
+		return next(ctx)
+	}
+
+	srv := handler.New(graph.NewExecutableSchema(gqlConfig))
 
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GET{})

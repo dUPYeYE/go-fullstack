@@ -1,6 +1,13 @@
 scalar Time
 scalar UUID
 
+enum Role {
+  admin
+  user
+}
+
+directive @authenticated(role: Role!) on FIELD_DEFINITION
+
 type User {
   id: UUID!
   name: String!
@@ -25,9 +32,9 @@ input UserFilter {
 }
 
 type Query {
-  users: [User!]!
-  user(filter: UserFilter!): User
-  me: User!
+  users: [User!]! @authenticated(role: admin)
+  user(filter: UserFilter!): User @authenticated(role: admin)
+  me: User! @authenticated(role: user)
 }
 
 input CreateUserInput {
@@ -45,8 +52,8 @@ input UpdateUserInput {
 
 type Mutation {
   createUser(input: CreateUserInput!): User!
-  updateUser(id: UUID!, input: UpdateUserInput!): User!
-  deleteUser(id: UUID!): Boolean!
+  updateUser(id: UUID!, input: UpdateUserInput!): User! @authenticated(role: user)
+  deleteUser(id: UUID!): Boolean! @authenticated(role: user)
 
   login(email: String!, password: String!): String!
   refreshToken: String!
